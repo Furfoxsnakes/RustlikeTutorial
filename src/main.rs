@@ -3,9 +3,15 @@ use specs::prelude::*;
 use std::cmp::{max,min};
 use specs_derive::Component;
 
+mod map;
+pub use map::*;
+mod rect;
+pub use rect::*;
+
 struct State {
     ecs: World
 }
+
 impl GameState for State {
     fn tick(&mut self, ctx : &mut Rltk) {
         ctx.cls();
@@ -50,12 +56,6 @@ struct LeftMover {
 
 struct LeftWalker {
 
-}
-
-#[derive(PartialEq, Copy, Clone)]
-enum TileType {
-    Wall,
-    Floor
 }
 
 impl State {
@@ -105,64 +105,6 @@ fn player_input(gs: &mut State, ctx: &mut Rltk){
     }
 }
 
-fn new_map() -> Vec<TileType> {
-    let mut map = vec![TileType::Floor; 80 * 50];
-
-    // set boundaries for top an bottom
-    for x in 0..80 {
-        map[xy_idx(x, 0)] = TileType::Wall;
-        map[xy_idx(x, 49)] = TileType::Wall;
-    }
-
-    // set boundaries for left and right
-    for y in 0..50 {
-        map[xy_idx(0, y)] = TileType::Wall;
-        map[xy_idx(79, y)] = TileType::Wall;
-    }
-
-    // random smattering of walls for a little flair
-    let mut rng = rltk::RandomNumberGenerator::new();
-
-    for _i in 0..400 {
-        let x = rng.roll_dice(1,79);
-        let y = rng.roll_dice(1, 49);
-        let idx = xy_idx(x,y);
-        if idx != xy_idx(40,25){
-            map[idx] = TileType::Wall;
-        }
-    }
-
-    map
-}
-
-fn draw_map(map: &[TileType], ctx: &mut Rltk){
-    let mut x = 0;
-    let mut y = 0;
-
-    for tile in map.iter(){
-        match tile {
-            TileType::Floor => {
-                ctx.set(x,y,RGB::named(rltk::GREY),
-                        RGB::named(rltk::BLACK), rltk::to_cp437('.'));
-            }
-            TileType::Wall => {
-                ctx.set(x,y,RGB::named(rltk::GREEN),
-                        RGB::named(rltk::BLACK), rltk::to_cp437('#'));
-            }
-        }
-
-        x += 1;
-        if x > 79 {
-            x = 0;
-            y += 1;
-        }
-    }
-}
-
-pub fn xy_idx(x: i32, y:i32) -> usize {
-    (y as usize * 80) + x as usize
-}
-
 fn main() -> rltk::BError {
     use rltk::RltkBuilder;
     let context = RltkBuilder::simple80x50()
@@ -178,12 +120,14 @@ fn main() -> rltk::BError {
     gs.ecs.register::<LeftMover>();
     gs.ecs.register::<Player>();
 
-    gs.ecs.insert(new_map());
+    let (rooms, map) = new_map_rooms_and_corridors();
+    gs.ecs.insert(map);
+    let (player_x,player_y) = rooms[0].center();
 
     // Create the player
     gs.ecs
         .create_entity()
-        .with(Position{ x: 40, y:25})
+        .with(Position{ x: player_x, y:player_y})
         .with(Renderable{
             glyph: rltk::to_cp437('@'),
             fg: RGB ::named(rltk::YELLOW),

@@ -1,13 +1,14 @@
 <html>
 <head>
     <meta content="text/html;charset=utf-8" http-equiv="Content-Type" />
+    <link rel="stylesheet" src="./wasm/RoguelikeTutorial.css">
 </head>
 <body>
-<canvas id="canvas" width="640" height="480"></canvas>
-<script src="./RoguelikeTutorial.js"></script>
+<canvas id="game-canvas"></canvas>
+<script src="./wasm/RoguelikeTutorial.js"></script>
 <script>
     window.addEventListener("load", async () => {
-        await wasm_bindgen("./RoguelikeTutorial_bg.wasm");
+        await wasm_bindgen("./wasm/RoguelikeTutorial_bg.wasm");
     });
 </script>
 </body>

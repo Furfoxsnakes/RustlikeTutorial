@@ -1,4 +1,4 @@
-use rltk::{Rltk, GameState, RGB, VirtualKeyCode};
+use rltk::{Rltk, GameState, RGB, VirtualKeyCode, Point, console};
 use specs::prelude::*;
 use std::cmp::{max,min};
 
@@ -9,82 +9,89 @@ pub use rect::Rect;
 pub use rect::*;
 mod components;
 pub use components::*;
+mod player;
 mod visibility_system;
+mod monster_ai_system;
+mod map_indexing_system;
+mod melee_combat_system;
+mod damage_system;
+
+pub use player::*;
+
 use visibility_system::VisibilitySystem;
+use crate::monster_ai_system::MonsterAI;
+use crate::map_indexing_system::MapIndexingSystem;
+use crate::melee_combat_system::MeleeCombatSystem;
+use crate::damage_system::DamageSystem;
 
-struct State {
-    ecs: World
-}
+#[derive(PartialEq, Copy, Clone)]
+pub enum RunState { AwaitingInput, PreRun, PlayerTurn, MonsterTurn }
 
-impl GameState for State {
-    fn tick(&mut self, ctx : &mut Rltk) {
-        ctx.cls();
-
-        player_input(self, ctx);
-        self.run_systems();
-
-        let map = self.ecs.fetch::<Map>();
-        draw_map(&self.ecs, ctx);
-
-        let positions = self.ecs.read_storage::<Position>();
-        let renderables = self.ecs.read_storage::<Renderable>();
-
-        for (pos, renderable) in (&positions, &renderables).join(){
-            ctx.set(pos.x, pos.y, renderable.fg, renderable.bg, renderable.glyph);
-        }
-    }
-}
-
-struct LeftWalker {
-
+pub struct State {
+    pub ecs: World
 }
 
 impl State {
     fn run_systems(&mut self) {
         let mut vis = VisibilitySystem{};
         vis.run_now(&self.ecs);
+        let mut mob = MonsterAI{};
+        mob.run_now(&self.ecs);
+        let mut mapidx = MapIndexingSystem{};
+        mapidx.run_now(&self.ecs);
+        let mut melee = MeleeCombatSystem{};
+        melee.run_now(&self.ecs);
+        let mut damage = DamageSystem{};
+        damage.run_now(&self.ecs);
         self.ecs.maintain();
     }
 }
 
-impl <'a> System<'a> for LeftWalker {
-    type SystemData = (ReadStorage<'a, LeftMover>, WriteStorage<'a, Position>);
+impl GameState for State {
+    fn tick(&mut self, ctx : &mut Rltk) {
+        ctx.cls();
 
-    fn run(&mut self, (lefty, mut pos): Self::SystemData) {
-        for (_lefty,pos) in (&lefty, &mut pos).join(){
-            pos.x -= 1;
-            if pos.x < 0 { pos.x = 79; }
+        let mut new_run_state;
+        {
+            let run_state = self.ecs.fetch::<RunState>();
+            new_run_state = *run_state;
         }
-    }
-}
 
-fn try_move_player(delta_x: i32, delta_y: i32, ecs: &mut World){
-    let mut positions = ecs.write_storage::<Position>();
-    let mut players = ecs.write_storage::<Player>();
-    let mut viewsheds = ecs.write_storage::<Viewshed>();
-    let map = ecs.fetch::<Map>();
-
-    for (_player, pos, viewshed) in (&mut players, &mut positions, &mut viewsheds).join() {
-        let destination_idx = map.xy_idx(pos.x + delta_x, pos.y + delta_y);
-        // let destination_idx = map.xy_idx(pos.x + delta_x, pos.y + delta_y);
-
-        if map.tiles[destination_idx] != TileType::Wall {
-            pos.x = min(79, max(0, pos.x + delta_x));
-            pos.y = min(49, max(0, pos.y + delta_y));
-            viewshed.dirty = true;
+        match new_run_state {
+            RunState::PreRun => {
+                self.run_systems();
+                new_run_state = RunState::AwaitingInput;
+            },
+            RunState::AwaitingInput => {
+                new_run_state = player_input(self, ctx);
+            },
+            RunState::PlayerTurn => {
+                self.run_systems();
+                new_run_state = RunState::MonsterTurn;
+            },
+            RunState::MonsterTurn => {
+                self.run_systems();
+                new_run_state = RunState::AwaitingInput;
+            }
         }
-    }
-}
 
-fn player_input(gs: &mut State, ctx: &mut Rltk){
-    match ctx.key {
-        None => {}
-        Some(key) => match key {
-            VirtualKeyCode::Left => try_move_player(-1, 0, &mut gs.ecs),
-            VirtualKeyCode::Right => try_move_player(1, 0, &mut gs.ecs),
-            VirtualKeyCode::Up => try_move_player(0, -1, &mut gs.ecs),
-            VirtualKeyCode::Down => try_move_player(0, 1, &mut gs.ecs),
-            _ => {}
+        {
+            let mut run_writer = self.ecs.write_resource::<RunState>();
+            *run_writer = new_run_state;
+        }
+        damage_system::delete_the_dead(&mut self.ecs);
+
+        draw_map(&self.ecs, ctx);
+
+        let positions = self.ecs.read_storage::<Position>();
+        let renderables = self.ecs.read_storage::<Renderable>();
+        let map = self.ecs.fetch::<Map>();
+
+        for (pos, renderable) in (&positions, &renderables).join() {
+            let idx = map.xy_idx(pos.x, pos.y);
+            if map.visible_tiles[idx] {
+                ctx.set(pos.x, pos.y, renderable.fg, renderable.bg, renderable.glyph);
+            }
         }
     }
 }
@@ -101,17 +108,23 @@ fn main() -> rltk::BError {
 
     gs.ecs.register::<Position>();
     gs.ecs.register::<Renderable>();
-    gs.ecs.register::<LeftMover>();
     gs.ecs.register::<Player>();
     gs.ecs.register::<Viewshed>();
+    gs.ecs.register::<Monster>();
+    gs.ecs.register::<Name>();
+    gs.ecs.register::<BlocksTile>();
+    gs.ecs.register::<CombatStats>();
+    gs.ecs.register::<WantsToMelee>();
+    gs.ecs.register::<SufferDamage>();
+
+
 
     // let (rooms, map) = new_map_rooms_and_corridors();
     let map : Map = Map::new_map_rooms_and_corridors();
     let (player_x,player_y) = map.rooms[0].center();
-    gs.ecs.insert(map);
 
     // Create the player
-    gs.ecs
+    let player_entity = gs.ecs
         .create_entity()
         .with(Position{ x: player_x, y:player_y})
         .with(Renderable{
@@ -121,21 +134,66 @@ fn main() -> rltk::BError {
         })
         .with(Player{})
         .with(Viewshed{ visible_tiles : Vec::new(), range : 8, dirty : true})
+        .with(Name{name: "Player".to_string()})
+        .with(CombatStats{
+            max_hp: 30,
+            hp: 30,
+            defense: 2,
+            power: 5
+        })
         .build();
 
-    // create some mock enemies
-    // for i in 0..10 {
-    //     gs.ecs
-    //         .create_entity()
-    //         .with(Position { x: i * 7, y: 20})
-    //         .with(Renderable{
-    //             glyph: rltk::to_cp437('☺'),
-    //             fg: RGB::named(rltk::RED),
-    //             bg: RGB::named(rltk::BLACK)
-    //         })
-    //         .with(LeftMover{})
-    //         .build();
-    // }
+    let mut rng = rltk::RandomNumberGenerator::new();
+    for (i,room) in map.rooms.iter().skip(1).enumerate() {
+        let (x,y) = room.center();
+
+        let glyph : rltk::FontCharType;
+        let fg : RGB;
+        let name : String;
+
+        let roll = rng.roll_dice(1,2);
+
+        match roll {
+            1 => {
+                glyph = rltk::to_cp437('g');
+                fg = RGB::named(rltk::RED);
+                name = "Goblin".to_string();
+            }
+            _ => {
+                glyph = rltk::to_cp437('O');
+                fg = RGB::named(rltk::DARK_GREEN);
+                name = "Orc".to_string();
+            }
+        }
+
+        gs.ecs.create_entity()
+            .with(Position{x,y})
+            .with(Renderable {
+                glyph : glyph,
+                fg : fg,
+                bg: RGB::named(rltk::BLACK)
+            })
+            .with(Viewshed{
+                visible_tiles: Vec::new(),
+                range: 8,
+                dirty: true
+            })
+            .with(Monster{})
+            .with(Name{ name: format!("{} #{}", &name, i) })
+            .with(BlocksTile{})
+            .with(CombatStats{
+                max_hp: 16,
+                hp: 16,
+                defense: 1,
+                power: 4
+            })
+            .build();
+    }
+
+    gs.ecs.insert(map);
+    gs.ecs.insert(Point::new(player_x, player_y));
+    gs.ecs.insert(RunState::PreRun);
+    gs.ecs.insert(player_entity);
 
     rltk::main_loop(context, gs)
 }

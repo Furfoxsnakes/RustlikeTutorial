@@ -1,0 +1,9 @@
+#game-canvas {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin-top: -240px;
+    margin-left: -320px;
+    width: 640px;
+    height: 480px;
+}

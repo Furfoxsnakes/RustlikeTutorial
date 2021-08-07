@@ -9,6 +9,10 @@ pub enum TileType {
     Wall, Floor
 }
 
+const MAP_WIDTH : usize = 80;
+const MAP_HEIGHT : usize = 43;
+const MAP_COUNT : usize = MAP_WIDTH * MAP_HEIGHT;
+
 #[derive(Default)]
 pub struct Map {
     pub tiles : Vec<TileType>,
@@ -22,8 +26,8 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn xy_idx(&self, x: i32, y:i32) -> usize {
-        (y as usize * 80) + x as usize
+    pub fn xy_idx(&self, x: i32, y: i32) -> usize {
+        (y as usize * self.width as usize) + x as usize
     }
 
     fn apply_room_to_map(&mut self, room: &Rect){
@@ -76,14 +80,14 @@ impl Map {
     /// Make a map with rooms and corridors carved out
     pub fn new_map_rooms_and_corridors() -> Map {
         let mut map = Map{
-            tiles : vec![TileType::Wall; 80*50],
+            tiles : vec![TileType::Wall; MAP_COUNT],
             rooms : Vec::new(),
-            width : 80,
-            height : 50,
-            revealed_tiles : vec![false; 80*50],
-            visible_tiles : vec![false; 80*50],
-            blocked : vec![false; 80*50],
-            tile_content: vec![Vec::new(); 80*50]
+            width : MAP_WIDTH as i32,
+            height : MAP_HEIGHT as i32,
+            revealed_tiles : vec![false; MAP_COUNT],
+            visible_tiles : vec![false; MAP_COUNT],
+            blocked : vec![false; MAP_COUNT],
+            tile_content: vec![Vec::new(); MAP_COUNT]
         };
 
         const MAX_ROOMS:i32 = 30;
@@ -95,8 +99,8 @@ impl Map {
         for _ in 0..MAX_ROOMS {
             let w = rng.range(MIN_SIZE, MAX_SIZE);
             let h = rng.range(MIN_SIZE, MAX_SIZE);
-            let x = rng.roll_dice(1, 79 - w);
-            let y = rng.roll_dice(1, 49 - h);
+            let x = rng.roll_dice(1, MAP_WIDTH as i32 - w - 1);
+            let y = rng.roll_dice(1, MAP_HEIGHT as i32 - h - 1);
             let new_room = Rect::new(x,y,w,h);
 
             // for other_room in rooms.iter() {
@@ -197,7 +201,7 @@ pub fn draw_map(ecs: &World, ctx: &mut Rltk){
 
         // Move the coordinates
         x += 1;
-        if x > 79 {
+        if x > MAP_WIDTH - 1 {
             x = 0;
             y += 1;
         }

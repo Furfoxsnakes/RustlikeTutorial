@@ -1,5 +1,5 @@
 use specs::prelude::*;
-use crate::{WantsToMelee, SufferDamage, CombatStats, Name};
+use crate::{WantsToMelee, SufferDamage, CombatStats, Name, game_log::GameLog};
 use rltk::console;
 
 pub struct MeleeCombatSystem {}
@@ -7,6 +7,7 @@ pub struct MeleeCombatSystem {}
 impl<'a> System<'a> for MeleeCombatSystem {
     type SystemData = (
         Entities<'a>,
+        WriteExpect<'a, GameLog>,
         WriteStorage<'a, WantsToMelee>,
         WriteStorage<'a, SufferDamage>,
         ReadStorage<'a, Name>,
@@ -14,7 +15,7 @@ impl<'a> System<'a> for MeleeCombatSystem {
     );
 
     fn run(&mut self, data : Self::SystemData) {
-        let (entities, mut wants_melee, mut inflict_damage, names, combat_stats) = data;
+        let (entities, mut gamelog, mut wants_melee, mut inflict_damage, names, combat_stats) = data;
 
         for(_entity, wants_melee, name, stats) in (&entities, &wants_melee, &names, &combat_stats).join() {
             if stats.hp > 0 {
@@ -26,9 +27,11 @@ impl<'a> System<'a> for MeleeCombatSystem {
                     let damage = i32::max(0, stats.power - target_stats.defense);
 
                     if damage == 0 {
-                        console::log(&format!("{} does no damage to {}", &name.name, &target_name.name));
+                        gamelog.entries.push(format!("{} does no damage to {}", &name.name, &target_name.name));
+                        // console::log(&format!("{} does no damage to {}", &name.name, &target_name.name));
                     } else {
-                        console::log(&format!("{} deals {} damage to {}", &name.name, damage, &target_name.name));
+                        gamelog.entries.push(format!("{} deals {} damage to {}", &name.name, damage, &target_name.name));
+                        // console::log(&format!("{} deals {} damage to {}", &name.name, damage, &target_name.name));
                         SufferDamage::new_damage(&mut inflict_damage, wants_melee.target, damage);
                     }
                 }

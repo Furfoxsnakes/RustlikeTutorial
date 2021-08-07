@@ -15,6 +15,8 @@ mod monster_ai_system;
 mod map_indexing_system;
 mod melee_combat_system;
 mod damage_system;
+mod gui;
+mod game_log;
 
 pub use player::*;
 
@@ -23,6 +25,7 @@ use crate::monster_ai_system::MonsterAI;
 use crate::map_indexing_system::MapIndexingSystem;
 use crate::melee_combat_system::MeleeCombatSystem;
 use crate::damage_system::DamageSystem;
+use crate::game_log::GameLog;
 
 #[derive(PartialEq, Copy, Clone)]
 pub enum RunState { AwaitingInput, PreRun, PlayerTurn, MonsterTurn }
@@ -93,14 +96,18 @@ impl GameState for State {
                 ctx.set(pos.x, pos.y, renderable.fg, renderable.bg, renderable.glyph);
             }
         }
+
+        gui::draw_ui(&self.ecs, ctx);
     }
 }
 
 fn main() -> rltk::BError {
     use rltk::RltkBuilder;
-    let context = RltkBuilder::simple80x50()
+    let mut context = RltkBuilder::simple80x50()
         .with_title("Roguelike Tutorial")
         .build()?;
+    context.with_post_scanlines(true);
+    // context.post_screenburn = true;
 
     let mut gs = State {
         ecs: World::new()
@@ -117,9 +124,6 @@ fn main() -> rltk::BError {
     gs.ecs.register::<WantsToMelee>();
     gs.ecs.register::<SufferDamage>();
 
-
-
-    // let (rooms, map) = new_map_rooms_and_corridors();
     let map : Map = Map::new_map_rooms_and_corridors();
     let (player_x,player_y) = map.rooms[0].center();
 
@@ -194,6 +198,7 @@ fn main() -> rltk::BError {
     gs.ecs.insert(Point::new(player_x, player_y));
     gs.ecs.insert(RunState::PreRun);
     gs.ecs.insert(player_entity);
+    gs.ecs.insert(GameLog{ entries: vec!["You have entered the dungeon. It's dark, and full of terrors.".to_string()]});
 
     rltk::main_loop(context, gs)
 }

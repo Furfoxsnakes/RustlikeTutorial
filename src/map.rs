@@ -9,9 +9,11 @@ pub enum TileType {
     Wall, Floor
 }
 
-const MAP_WIDTH : usize = 80;
-const MAP_HEIGHT : usize = 43;
-const MAP_COUNT : usize = MAP_WIDTH * MAP_HEIGHT;
+pub const MAP_WIDTH : usize = 80;
+pub const MAP_HEIGHT : usize = 43;
+pub const MAP_COUNT : usize = MAP_WIDTH * MAP_HEIGHT;
+pub const MAX_MONSTERS : usize = 4;
+pub const MAX_ITEMS : usize = 2;
 
 #[derive(Default)]
 pub struct Map {

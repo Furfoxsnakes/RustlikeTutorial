@@ -1,7 +1,7 @@
 use specs::prelude::*;
 use super::{Viewshed, Position, Map, Monster};
 use rltk::{field_of_view, Point, console};
-use crate::{Name, RunState, WantsToMelee};
+use crate::{RunState, WantsToMelee};
 
 pub struct MonsterAI {
 

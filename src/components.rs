@@ -17,7 +17,8 @@ pub struct Position {
 pub struct Renderable {
     pub glyph: rltk::FontCharType,
     pub fg: RGB,
-    pub bg: RGB
+    pub bg: RGB,
+    pub render_order : i32
 }
 
 #[derive(Component)]
@@ -73,4 +74,33 @@ impl SufferDamage {
             store.insert(victim,dmg).expect("Unable to insert damage");
         }
     }
+}
+
+#[derive(Component,Debug)]
+pub struct Item {}
+
+#[derive(Component, Debug)]
+pub struct Potion {
+    pub amount : i32
+}
+
+#[derive(Component, Debug)]
+pub struct InBackpack {
+    pub owner : Entity
+}
+
+#[derive(Component, Debug)]
+pub struct WantsToPickupItem {
+    pub collected_by : Entity,
+    pub item : Entity
+}
+
+#[derive(Component, Debug)]
+pub struct WantsToDropItem {
+    pub item : Entity
+}
+
+#[derive(Component, Debug)]
+pub struct WantsToDrinkPotion {
+    pub potion : Entity
 }
